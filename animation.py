@@ -5,7 +5,7 @@ import os
 import random
 import uuid
 
-from curses_tools import draw_frame, get_frame_size
+from curses_tools import draw_frame, get_frame_size, get_max_coords
 from obstacles import Obstacle
 from settings import FRAMES_DIR, STARS_COUNT, TIC_TIMEOUT
 
@@ -38,7 +38,8 @@ async def blink(canvas, row, column, symbol="*"):
 
 
 def animate_spaceship():
-    frames = load_frames("rocket")
+    rocket = load_frames("rocket")
+    frames = sorted(rocket * 2)
     return itertools.cycle(frames)
 
 
@@ -71,8 +72,7 @@ async def fire(canvas, start_row, start_column, rows_speed=-0.3, columns_speed=0
 
     symbol = "-" if columns_speed else "|"
 
-    rows, columns = canvas.getmaxyx()
-    max_row, max_column = rows - 1, columns - 1
+    max_row, max_column = get_max_coords(canvas)
 
     curses.beep()
     global obstacles_list, obstacles_in_last_collisions
@@ -89,29 +89,30 @@ async def fire(canvas, start_row, start_column, rows_speed=-0.3, columns_speed=0
 
 
 async def fly_garbage(canvas, column, garbage_frame, speed=0.5):
-    rows_number, columns_number = canvas.getmaxyx()
-
-    column = max(column, 0)
-    column = min(column, columns_number - 1)
+    row_max, column_max = get_max_coords(canvas)
+    column = min(max(column, 0), column_max)
     row = 0
-
     height, width = get_frame_size(garbage_frame)
 
     global obstacles_list, obstacles_in_last_collisions
-    while row < rows_number:
-        uid = uuid.uuid4()
-        obstacle = Obstacle(row, column, height, width, uid)
-        obstacles_list.append(obstacle)
 
-        draw_frame(canvas, row, column, garbage_frame)
+    uid = uuid.uuid4()
+    obstacle = Obstacle(row, column, height, width, uid)
+    obstacles_list.append(obstacle)
+
+    while obstacle.row < row_max:
+        draw_frame(canvas, obstacle.row, column, garbage_frame)
         await asyncio.sleep(0)
-        draw_frame(canvas, row, column, garbage_frame, negative=True)
+        draw_frame(canvas, obstacle.row, column, garbage_frame, negative=True)
 
-        obstacles_list.remove(obstacle)
         if obstacle in obstacles_in_last_collisions:
             obstacles_in_last_collisions.remove(obstacle)
+            obstacles_list.remove(obstacle)
             row = obstacle.row + obstacle.rows_size / 2
             column = obstacle.column + obstacle.columns_size / 2
             await explode(canvas, round(row), round(column))
             return
-        row += speed
+
+        obstacle.row += speed
+
+    obstacles_list.remove(obstacle)

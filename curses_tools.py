@@ -5,6 +5,13 @@ UP_KEY_CODE = 259
 DOWN_KEY_CODE = 258
 
 
+def get_max_coords(canvas):
+    """Returns coordinates of point most distant from the origin."""
+    # canvas.getmaxyx() returns height and width of the window and is off by one
+    y, x = canvas.getmaxyx()
+    return y - 1, x - 1
+
+
 def read_controls(canvas):
     """Read keys pressed and returns tuple witl controls state."""
 
